@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sharpe Ratio Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.1/chart.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        #statsContainer {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .strategy-stat {
+            background-color: white;
+            border: 1px solid #e0e0e0;
+            padding: 15px;
+            margin: 10px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            flex: 1;
+            min-width: 150px;
+            transition: transform 0.3s ease;
+        }
+        .strategy-stat:hover {
+            transform: scale(1.05);
+        }
+        #sharpeRatioChart {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>12-Month Rolling Sharpe Ratios</h1>
+    <div id="statsContainer"></div>
+    <canvas id="sharpeRatioChart"></canvas>
+
+    <script>
+        // Color palette
+        const colors = {
+            CSHFI: '#1f4e79',
+            'Event Driven': '#c15a5a',
+            'Fixed Income Arbtirage': '#2a6b47',
+            'Global Macro': '#8e5b9f',
+            'Long-Short Equity': '#d4a259',
+            'Managed Futures': '#4d7c8a',
+            'Multi-Strategy': '#9c6644',
+            MSCI: '#404040'
+        };
+
+        // Utility function to calculate statistics
+        function calculateStats(data, column) {
+            const values = data.map(row => parseFloat(row[column])).filter(val => !isNaN(val));
+            return {
+                mean: (values.reduce((a, b) => a + b, 0) / values.length).toFixed(2),
+                min: Math.min(...values).toFixed(2),
+                max: Math.max(...values).toFixed(2)
+            };
+        }
+
+        // Fetch and process CSV
+        Papa.parse('data/rollingsharpe12monthraw.csv', {
+            download: true,
+            header: true,
+            complete: function(results) {
+                // Reverse data to show chronological order
+                const data = results.data.reverse();
+                
+                // Populate statistics container
+                const statsContainer = document.getElementById('statsContainer');
+                Object.keys(colors).filter(key => key !== 'Date').forEach(strategy => {
+                    const stats = calculateStats(data, strategy);
+                    const statElement = document.createElement('div');
+                    statElement.className = 'strategy-stat';
+                    statElement.innerHTML = `
+                        <h3 style="color:${colors[strategy]}">${strategy}</h3>
+                        <p>Mean: ${stats.mean}</p>
+                        <p>Min: ${stats.min}</p>
+                        <p>Max: ${stats.max}</p>
+                    `;
+                    statsContainer.appendChild(statElement);
+                });
+
+                // Prepare chart data
+                const chartData = {
+                    labels: data.map(row => row.Date),
+                    datasets: Object.keys(colors)
+                        .filter(key => key !== 'Date')
+                        .map(strategy => ({
+                            label: strategy,
+                            data: data.map(row => parseFloat(row[strategy])),
+                            borderColor: colors[strategy],
+                            backgroundColor: colors[strategy] + '30', // Add some transparency
+                            borderWidth: 2
+                        }))
+                };
+
+                // Create chart
+                const ctx = document.getElementById('sharpeRatioChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: chartData,
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Sharpe Ratio Performance Over Time'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Sharpe Ratio'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
